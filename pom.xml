@@ -234,7 +234,7 @@
 			<version>3.1</version>
 		</dependency>
 
-        <!-- for persistence
+		<!-- for persistence
         <dependency>
             <groupId>com.thoughtworks.xstream</groupId>
             <artifactId>xstream</artifactId>

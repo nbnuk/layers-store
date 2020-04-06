@@ -182,7 +182,13 @@ public class SpatialUtil {
             double shapearea = 0;
 
             for (String area : areas) {
+                area = area.replace("MULTIPOLYGON ZM", ""); //horrible 3-D or 4-D WKT. The actual area calculations only use the first 2 (x,y) coordinates in each point
+                area = area.replace("MULTIPOLYGON Z", "");
+                area = area.replace("MULTIPOLYGON M", "");
                 area = area.replace("MULTIPOLYGON", "");
+                area = area.replace("POLYGON ZM", "");
+                area = area.replace("POLYGON Z", "");
+                area = area.replace("POLYGON M", "");
                 area = area.replace("POLYGON", "");
                 area = area.replace(")", "");
                 area = area.replace("(", "");

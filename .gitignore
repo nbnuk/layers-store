@@ -1,2 +1,5 @@
 target
 *.iml
+.idea*
+classes/*
+.DS_Store
