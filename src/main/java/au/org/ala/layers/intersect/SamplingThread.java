@@ -185,7 +185,8 @@ public class SamplingThread extends Thread {
                         sb.append("\n");
                     }
                     if (values[i] >= 0) {
-                        sb.append(categories[values[i]]);
+                        String raw_val = categories[values[i]];
+                        sb.append(raw_val.replaceAll("\\r\\n|\\r|\\n", ""));
                     } else {
                         sb.append("");
                     }

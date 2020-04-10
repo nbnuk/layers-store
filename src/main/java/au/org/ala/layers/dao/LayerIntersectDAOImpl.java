@@ -295,13 +295,15 @@ public class LayerIntersectDAOImpl implements LayerIntersectDAO {
                         short[] idx = ssf.getColumnIdxs(f.getShapeFields());
                         int value = ssf.intersectInt(longitude, latitude);
                         if (value >= 0) {
-                            sb.append(categories[idx[value]]);
+                            String raw_val = categories[idx[value]];
+                            sb.append(raw_val.replaceAll("\\r\\n|\\r|\\n", ""));
                         }
                     } else {
                         ObjectDAO objectDao = (ObjectDAO) appcontext.getBean("objectDao");
                         Objects o = objectDao.getObjectByIdAndLocation(f.getFieldId(), longitude, latitude);
                         if (o != null) {
-                            sb.append(o.getName());
+                            String raw_val = o.getName();
+                            sb.append(raw_val.replaceAll("\\r\\n|\\r|\\n", ""));
                         }
                     }
                 } else {
@@ -324,7 +326,8 @@ public class LayerIntersectDAOImpl implements LayerIntersectDAO {
                                 if (f.getClasses() != null) {
                                     GridClass gc = f.getClasses().get((int) fv);
                                     if (gc != null) {
-                                        sb.append(gc.getName());
+                                        String raw_val = gc.getName();
+                                        sb.append(raw_val.replaceAll("\\r\\n|\\r|\\n", ""));
                                     }
                                 } else {
                                     if (!Float.isNaN(fv)) {
@@ -336,7 +339,8 @@ public class LayerIntersectDAOImpl implements LayerIntersectDAO {
                             if (f.getClasses() != null) {
                                 GridClass gc = f.getClasses().get(v.intValue());
                                 if (gc != null) {
-                                    sb.append(gc.getName());
+                                    String raw_val = gc.getName();
+                                    sb.append(raw_val.replaceAll("\\r\\n|\\r|\\n", ""));
                                 }
                             } else {
                                 if (v != null && !v.isNaN()) {
@@ -351,7 +355,8 @@ public class LayerIntersectDAOImpl implements LayerIntersectDAO {
                             if (f.getClasses() != null) {
                                 GridClass gc = f.getClasses().get((int) fv);
                                 if (gc != null) {
-                                    sb.append(gc.getName());
+                                    String raw_val = gc.getName();
+                                    sb.append(raw_val.replaceAll("\\r\\n|\\r|\\n", ""));
                                 }
                             } else {
                                 if (!Float.isNaN(fv)) {
@@ -369,7 +374,8 @@ public class LayerIntersectDAOImpl implements LayerIntersectDAO {
                     Grid grid = new Grid(filename);
 
                     if (grid != null && (new File(filename + ".grd").exists())) {
-                        sb.append(String.valueOf(grid.getValues(p)[0]));
+                        String raw_val = String.valueOf(grid.getValues(p)[0]);
+                        sb.append(raw_val.replaceAll("\\r\\n|\\r|\\n", ""));
                     }
                 }
             }
@@ -391,7 +397,7 @@ public class LayerIntersectDAOImpl implements LayerIntersectDAO {
                 if (s == null) {
                     s = "";
                 }
-                output.put(entry.getKey(), s);
+                output.put(entry.getKey(), s.replaceAll("\\r\\n|\\r|\\n", ""));
             }
         }
 
@@ -417,7 +423,8 @@ public class LayerIntersectDAOImpl implements LayerIntersectDAO {
                     if (entry.getValue() == null || entry.getValue().isNaN()) {
                         output.put(entry.getKey(), "");
                     } else {
-                        output.put(entry.getKey(), entry.getValue().toString());
+                        String raw_val = entry.getValue().toString();
+                        output.put(entry.getKey(), raw_val.replaceAll("\\r\\n|\\r|\\n", ""));
                     }
                 }
             }
