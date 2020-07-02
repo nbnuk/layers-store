@@ -42,6 +42,7 @@ public class SamplingThread extends Thread {
     SimpleShapeFileCache simpleShapeFileCache;
     int gridBufferSize;
     IntersectCallback callback;
+    boolean withCoordinateUncertainty;
 
     public SamplingThread(LinkedBlockingQueue<Integer> lbq, CountDownLatch cdl, IntersectionFile[] intersectionFiles,
                           double[][] points, ArrayList<String> output, int threadCount,
@@ -55,6 +56,23 @@ public class SamplingThread extends Thread {
         this.simpleShapeFileCache = simpleShapeFileCache;
         this.gridBufferSize = gridBufferSize;
         this.callback = callback;
+        this.withCoordinateUncertainty = false;
+        setPriority(MIN_PRIORITY);
+    }
+    public SamplingThread(LinkedBlockingQueue<Integer> lbq, CountDownLatch cdl, IntersectionFile[] intersectionFiles,
+                          double[][] points, ArrayList<String> output, int threadCount,
+                          SimpleShapeFileCache simpleShapeFileCache, int gridBufferSize, IntersectCallback callback,
+                          boolean withCoordinateUncertainty) {
+        this.lbq = lbq;
+        this.cdl = cdl;
+        this.points = points;
+        this.intersectionFiles = intersectionFiles;
+        this.output = output;
+        this.threadCount = threadCount;
+        this.simpleShapeFileCache = simpleShapeFileCache;
+        this.gridBufferSize = gridBufferSize;
+        this.callback = callback;
+        this.withCoordinateUncertainty = withCoordinateUncertainty;
         setPriority(MIN_PRIORITY);
     }
 
@@ -67,7 +85,7 @@ public class SamplingThread extends Thread {
 
                 try {
                     StringBuilder sb = new StringBuilder();
-                    sample(points, intersectionFiles[pos], sb);
+                    sample(points, intersectionFiles[pos], sb, this.withCoordinateUncertainty);
                     output.set(pos, sb.toString());
                 } catch (Exception e) {
                     logger.error(e.getMessage(), e);
@@ -81,24 +99,25 @@ public class SamplingThread extends Thread {
         }
     }
 
-    public void sample(double[][] points, IntersectionFile intersectionFile, StringBuilder sb) {
+    public void sample(double[][] points, IntersectionFile intersectionFile, StringBuilder sb, boolean withCoordinateUncertainty) {
         if (intersectionFile == null) {
             return;
         }
         HashMap<Integer, GridClass> classes = intersectionFile.getClasses();
         String shapeFieldName = intersectionFile.getShapeFields();
         String fileName = intersectionFile.getFilePath();
+        if (withCoordinateUncertainty) fileName = fileName + "_1414mbuffer"; //** RR test
         String name = intersectionFile.getFieldId();
         long start = System.currentTimeMillis();
         logger.info("Starting sampling " + points.length + " points in " + name + ":"
-                + fileName + (shapeFieldName == null ? "" : " field: " + shapeFieldName));
+                + fileName + (shapeFieldName == null ? "" : " field: " + shapeFieldName + (withCoordinateUncertainty? " coordinateUncertainty included" : "")));
         callback.progressMessage("Started sampling layer:" + intersectionFile.getLayerName());
         if (shapeFieldName != null) {
-            intersectShape(fileName, shapeFieldName, points, sb);
+            intersectShape(fileName, shapeFieldName, points, sb, withCoordinateUncertainty);
         } else if (classes != null) {
-            intersectGridAsContextual(fileName, classes, points, sb);
+            intersectGridAsContextual(fileName, classes, points, sb); //TODO: implement withCoordinateUncertainty
         } else {
-            intersectGrid(fileName, points, sb);
+            intersectGrid(fileName, points, sb); //TODO: implement withCoordinateUncertainty
         }
 
         logger.info("Finished sampling " + points.length + " points in " + name + ":"
@@ -161,7 +180,7 @@ public class SamplingThread extends Thread {
         }
     }
 
-    void intersectShape(String filename, String fieldName, double[][] points, StringBuilder sb) {
+    void intersectShape(String filename, String fieldName, double[][] points, StringBuilder sb, boolean allowOverlaps) {
         try {
             SimpleShapeFile ssf = null;
 
@@ -177,23 +196,48 @@ public class SamplingThread extends Thread {
             int column_idx = ssf.getColumnIdx(fieldName);
             String[] categories = ssf.getColumnLookup(column_idx);
 
-            int[] values = ssf.intersect(points, categories, column_idx, threadCount);
+            if (!allowOverlaps) {
+                int[] values = ssf.intersect(points, categories, column_idx, threadCount);
 
-            if (values != null) {
-                for (int i = 0; i < values.length; i++) {
-                    if (i > 0) {
-                        sb.append("\n");
+                if (values != null) {
+                    for (int i = 0; i < values.length; i++) {
+                        if (i > 0) {
+                            sb.append("\n");
+                        }
+                        if (values[i] >= 0) {
+                            String raw_val = categories[values[i]];
+                            sb.append(raw_val.replaceAll("\\r\\n|\\r|\\n", ""));
+                        } else {
+                            sb.append("");
+                        }
                     }
-                    if (values[i] >= 0) {
-                        String raw_val = categories[values[i]];
-                        sb.append(raw_val.replaceAll("\\r\\n|\\r|\\n", ""));
-                    } else {
-                        sb.append("");
+                } else {
+                    for (int i = 1; i < points.length; i++) {
+                        sb.append("\n");
                     }
                 }
             } else {
-                for (int i = 1; i < points.length; i++) {
-                    sb.append("\n");
+                int[][] valuesMult = ssf.intersect(points, categories, column_idx, threadCount, allowOverlaps);
+
+                if (valuesMult != null) {
+                    for (int i = 0; i < valuesMult.length; i++) {
+                        if (i > 0) {
+                            sb.append("\n");
+                        }
+                        if (valuesMult[i][0] >= 0) {
+                            for (int j = 0; j < valuesMult[i].length; j++ ) {
+                                String raw_val = categories[valuesMult[i][j]];
+                                if (j > 0) sb.append("|"); //note, that legitimate shape names with their own pipe marks will break this
+                                sb.append(raw_val.replaceAll("\\r\\n|\\r|\\n", ""));
+                            }
+                        } else {
+                            sb.append("");
+                        }
+                    }
+                } else {
+                    for (int i = 1; i < points.length; i++) {
+                        sb.append("\n");
+                    }
                 }
             }
         } catch (Exception e) {

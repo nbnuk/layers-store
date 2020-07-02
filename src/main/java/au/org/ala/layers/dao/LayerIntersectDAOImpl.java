@@ -16,6 +16,7 @@ package au.org.ala.layers.dao;
 
 import au.com.bytecode.opencsv.CSVReader;
 import au.org.ala.layers.dto.*;
+import au.org.ala.layers.dto.Objects;
 import au.org.ala.layers.grid.GridCacheReader;
 import au.org.ala.layers.intersect.Grid;
 import au.org.ala.layers.intersect.IntersectConfig;
@@ -36,11 +37,8 @@ import java.io.OutputStreamWriter;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Vector;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.zip.ZipEntry;
@@ -539,6 +537,11 @@ public class LayerIntersectDAOImpl implements LayerIntersectDAO {
 
     @Override
     public ArrayList<String> sampling(String[] fieldIds, double[][] points, IntersectCallback callback) {
+        return sampling(fieldIds, points, callback, false);
+    }
+
+    @Override
+    public ArrayList<String> sampling(String[] fieldIds, double[][] points, IntersectCallback callback, boolean withCoordinateUncertainty) {
         init();
         IntersectionFile[] intersectionFiles = new IntersectionFile[fieldIds.length];
         for (int i = 0; i < fieldIds.length; i++) {
@@ -556,8 +559,10 @@ public class LayerIntersectDAOImpl implements LayerIntersectDAO {
         }
         if (callback == null)
             callback = new DummyCallback();
-        return sampling(intersectionFiles, points, callback);
+        return sampling(intersectionFiles, points, callback, withCoordinateUncertainty);
     }
+
+
 
     @Override
     public ArrayList<String> sampling(String[] fieldIds, double[][] points) {
@@ -570,13 +575,17 @@ public class LayerIntersectDAOImpl implements LayerIntersectDAO {
     }
 
     ArrayList<String> sampling(IntersectionFile[] intersectionFiles, double[][] points, IntersectCallback callback) {
+        return sampling(intersectionFiles, points, callback, false);
+    }
+
+    ArrayList<String> sampling(IntersectionFile[] intersectionFiles, double[][] points, IntersectCallback callback, boolean withCoordinateUncertainty) {
         init();
         if (callback == null)
             callback = new DummyCallback();
         if (intersectConfig.isLocalSampling()) {
-            return localSampling(intersectionFiles, points, callback);
+            return localSampling(intersectionFiles, points, callback, withCoordinateUncertainty);
         } else {
-            return remoteSampling(intersectionFiles, points, callback);
+            return remoteSampling(intersectionFiles, points, callback, withCoordinateUncertainty);
         }
     }
 
@@ -587,6 +596,10 @@ public class LayerIntersectDAOImpl implements LayerIntersectDAO {
     }
 
     ArrayList<String> localSampling(IntersectionFile[] intersectionFiles, double[][] points, IntersectCallback callback) {
+        return localSampling(intersectionFiles, points, callback, false);
+    }
+
+    ArrayList<String> localSampling(IntersectionFile[] intersectionFiles, double[][] points, IntersectCallback callback, boolean withCoordinateUncertainty) {
         logger.info("begin LOCAL sampling, number of threads " + intersectConfig.getThreadCount()
                 + ", number of layers=" + intersectionFiles.length + ", number of coordinates=" + points.length);
         long start = System.currentTimeMillis();
@@ -611,7 +624,8 @@ public class LayerIntersectDAOImpl implements LayerIntersectDAO {
                     intersectConfig.getThreadCount(),
                     intersectConfig.getShapeFileCache(),
                     intersectConfig.getGridBufferSize(),
-                    callback
+                    callback,
+                    withCoordinateUncertainty
             );
             threads[i].start();
         }
@@ -637,6 +651,11 @@ public class LayerIntersectDAOImpl implements LayerIntersectDAO {
     }
 
     ArrayList<String> remoteSampling(IntersectionFile[] intersectionFiles, double[][] points, IntersectCallback callback) {
+        return remoteSampling(intersectionFiles, points, callback, false);
+    }
+
+    //TODO: *** withCoordinateUncertainty needs to be implemented for this
+    ArrayList<String> remoteSampling(IntersectionFile[] intersectionFiles, double[][] points, IntersectCallback callback, boolean withCoordinateUncertainty) {
         logger.info("begin REMOTE sampling, number of threads " + intersectConfig.getThreadCount()
                 + ", number of layers=" + intersectionFiles.length + ", number of coordinates=" + points.length);
 

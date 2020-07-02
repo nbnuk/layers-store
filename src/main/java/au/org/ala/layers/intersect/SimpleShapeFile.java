@@ -21,10 +21,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -400,7 +397,16 @@ public class SimpleShapeFile extends Object implements Serializable {
      * for each provided point, or -1 for not found as int []
      */
     public int[] intersect(double[][] points, String[] lookup, int column, int threadcount) {
-        int i;
+        int[][] res = intersect(points, lookup, column, threadcount, false);
+        int[] firstRes = new int[points.length];
+        for (int i = 0; i < points.length; i++) {
+            firstRes[i] = res[i][0];
+        }
+        return firstRes;
+    }
+
+    public int[][] intersect(double[][] points, String[] lookup, int column, int threadcount, boolean allowOverlaps) {
+        int i, j;
 
         //copy, tag and sort points
         PointPos[] p = new PointPos[points.length];
@@ -440,10 +446,10 @@ public class SimpleShapeFile extends Object implements Serializable {
 
         IntersectionThread[] it = new IntersectionThread[threadcount];
 
-        int[] target = new int[points.length];
+        int[][] target = new int[points.length][];
 
         for (i = 0; i < threadcount; i++) {
-            it[i] = new IntersectionThread(shapesreference, p, lbq, step, target, cdl);
+            it[i] = new IntersectionThread(shapesreference, p, lbq, step, target, cdl, allowOverlaps);
         }
 
         //wait for all parts to be finished
@@ -461,28 +467,34 @@ public class SimpleShapeFile extends Object implements Serializable {
         //transform target from shapes_idx to column_idx
         if (singleColumn == null && multiColumn == null) {
             for (i = 0; i < target.length; i++) {
-                String s = dbf.getValue(target[i], column);
-                int v = java.util.Arrays.binarySearch(lookup, s);
-                if (v < 0) {
-                    v = -1;
+                for (j = 0; j < target[i].length; j++) {
+                    String s = dbf.getValue(target[i][j], column);
+                    int v = java.util.Arrays.binarySearch(lookup, s);
+                    if (v < 0) {
+                        v = -1;
+                    }
+                    target[i][j] = v;
                 }
-                target[i] = v;
             }
         } else if (singleColumn != null) {
             for (i = 0; i < target.length; i++) {
-                if (target[i] >= 0 && target[i] < singleColumn.length) {
-                    target[i] = singleColumn[target[i]];
-                } else {
-                    target[i] = -1;
+                for (j = 0; j < target[i].length; j++) {
+                    if (target[i][j] >= 0 && target[i][j] < singleColumn.length) {
+                        target[i][j] = singleColumn[target[i][j]];
+                    } else {
+                        target[i][j] = -1;
+                    }
                 }
             }
         } else {
             for (i = 0; i < target.length; i++) {
-                short[] multiCol = multiColumn.get(column);
-                if (target[i] >= 0 && target[i] < multiCol.length) {
-                    target[i] = multiCol[target[i]];
-                } else {
-                    target[i] = -1;
+                short[] multiCol = multiColumn.get(column); //TODO: why initialise this inside the loop?
+                for (j = 0; j < target[i].length; j++) {
+                    if (target[i][j] >= 0 && target[i][j] < multiCol.length) {
+                        target[i][j] = multiCol[target[i][j]];
+                    } else {
+                        target[i][j] = -1;
+                    }
                 }
             }
         }
@@ -1984,6 +1996,70 @@ class ShapesReference extends Object implements Serializable {
         }
         return -1;
     }
+
+    /**
+     * performs intersection on one point, allowing for overlapping shapes (i.e. point can intersect with multiple shapes)
+     *
+     * @param longitude longitude of point to intersect as double
+     * @param latitude  latitude of point to intersect as double
+     * @return array of shape indexes if intersection(s) found, or single array element of -1 for no intersections
+     */
+    public int[] intersectionAllowOverlaps(double longitude, double latitude) {
+        ArrayList<ComplexRegion> sra = sr.getRegions();
+
+        int i;
+        int[] intersects = null;
+
+        /* test for mask */
+        if (mask != null) {
+            /* apply multipliers */
+            int long1 = (int) Math.floor((longitude - boundingbox_all[0][0]) * mask_long_multiplier);
+            int lat1 = (int) Math.floor((latitude - boundingbox_all[0][1]) * mask_lat_multiplier);
+            /* check is within mask bounds */
+            if (long1 >= 0 && long1 < mask[0].length
+                    && lat1 >= 0 && lat1 < mask.length
+                    && mask[long1][lat1] != null) {
+
+                /* get list of shapes to check at this mask cell */
+                ArrayList<Integer> ali = mask[long1][lat1];
+
+                /* check each potential cell */
+                for (i = 0; i < ali.size(); i++) {
+                    if (sra.get(ali.get(i).intValue()).isWithin(longitude, latitude)) {
+                        if (intersects == null) {
+                            intersects = new int[1];
+                            intersects[0] = ali.get(i).intValue();
+                        } else {
+                            int[] intersectsNew = Arrays.copyOf(intersects, intersects.length+1);
+                            intersectsNew[intersectsNew.length-1] = ali.get(i).intValue();
+                            intersects = intersectsNew;
+                        }
+                        //return ali.get(i).intValue();
+                    }
+                }
+            }
+        } else {
+            /* no mask, check all shapes */
+            for (i = 0; i < sra.size(); i++) {
+                if (sra.get(i).isWithin(longitude, latitude)) {
+                    if (intersects == null) {
+                        intersects = new int[1];
+                        intersects[0] = i;
+                    } else {
+                        int[] intersectsNew = Arrays.copyOf(intersects, intersects.length+1);
+                        intersectsNew[intersectsNew.length-1] = i;
+                        intersects = intersectsNew;
+                    }
+                    //return i;
+                }
+            }
+        }
+        if (intersects == null) {
+            intersects = new int[1];
+            intersects[0] = -1;
+        }
+        return intersects;
+    }
 }
 
 class IntersectionThread implements Runnable {
@@ -1995,10 +2071,11 @@ class IntersectionThread implements Runnable {
     PointPos[] points;
     LinkedBlockingQueue<Integer> lbq;
     int step;
-    int[] target;
+    int[][] target;
     CountDownLatch cdl;
+    boolean allowOverlaps;
 
-    public IntersectionThread(ShapesReference shapesreference_, PointPos[] points_, LinkedBlockingQueue<Integer> lbq_, int step_, int[] target_, CountDownLatch cdl_) {
+    public IntersectionThread(ShapesReference shapesreference_, PointPos[] points_, LinkedBlockingQueue<Integer> lbq_, int step_, int[][] target_, CountDownLatch cdl_, boolean _allowOverlaps) {
         t = new Thread(this);
         t.setPriority(Thread.MIN_PRIORITY);
 
@@ -2010,6 +2087,7 @@ class IntersectionThread implements Runnable {
         target = target_;
 
         cdl = cdl_;
+        allowOverlaps = _allowOverlaps;
 
         t.start();
     }
@@ -2017,7 +2095,8 @@ class IntersectionThread implements Runnable {
     @Override
     public void run() {
 
-        int i, idx;
+        int i;
+        int[] idx;
 
         /* get next batch */
         Integer start;
@@ -2034,11 +2113,15 @@ class IntersectionThread implements Runnable {
                 int sv = start.intValue();
                 for (i = sv; i < end; i++) {
                     if (i > sv && points[i - 1].x == points[i].x && points[i - 1].y == points[i].y) {
-                        target[points[i].pos] = target[points[i - 1].pos];
-                    } else if ((idx = shapesreference.intersection(points[i].x, points[i].y)) >= 0) {
-                        target[points[i].pos] = idx;
+                        target[points[i].pos] = Arrays.copyOf(target[points[i - 1].pos], target[points[i - 1].pos].length);
                     } else {
-                        target[points[i].pos] = -1;
+                        if (allowOverlaps) {
+                            idx = shapesreference.intersectionAllowOverlaps(points[i].x, points[i].y);
+                        } else {
+                            idx = new int[1];
+                            idx[0] = shapesreference.intersection(points[i].x, points[i].y);
+                        }
+                        target[points[i].pos] = idx;
                     }
                 }
 
