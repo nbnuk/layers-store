@@ -556,6 +556,16 @@ public class LayerIntersectDAOImpl implements LayerIntersectDAO {
                     logger.warn("failed to find layer for id '" + fieldIds[i] + "'");
                 }
             }
+            if (intersectionFiles[i] != null) {
+                Field field = fieldDao.getFieldById(fieldIds[i]);
+                Layer layer = null;
+                if (field != null) {
+                    layer = layerDao.getLayerById(Integer.parseInt(field.getSpid()));
+                }
+                if (layer != null) {
+                    intersectionFiles[i].setBufferInMetres(layer.getBufferInMetres());
+                }
+            }
         }
         if (callback == null)
             callback = new DummyCallback();
@@ -585,7 +595,7 @@ public class LayerIntersectDAOImpl implements LayerIntersectDAO {
         if (intersectConfig.isLocalSampling()) {
             return localSampling(intersectionFiles, points, callback, withCoordinateUncertainty);
         } else {
-            return remoteSampling(intersectionFiles, points, callback, withCoordinateUncertainty);
+            return remoteSampling(intersectionFiles, points, callback, withCoordinateUncertainty); //TODO not implemented
         }
     }
 

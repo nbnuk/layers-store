@@ -151,6 +151,9 @@ public class Layer {
     @Column(name = "pid")
     private String pid;
 
+    @Column(name = "buffer_in_metres")
+    private Integer buffer_in_metres;
+
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "dt_added")
     private Date dt_added;
@@ -498,6 +501,14 @@ public class Layer {
         this.pid = pid;
     }
 
+    public Integer getBufferInMetres() {
+        return buffer_in_metres;
+    }
+
+    public void setBufferInMetres(Integer bufferInMetres) {
+        this.buffer_in_metres = bufferInMetres;
+    }
+
     public String[] toArray() {
         if (description == null) {
             description = "";
@@ -532,6 +543,7 @@ public class Layer {
         v.add(notes.replaceAll("\n", " "));
         v.add(metadatapath);
         v.add(keywords);
+        v.add(buffer_in_metres);
 
         return (String[]) v.toArray(new String[v.size()]);
 
@@ -575,6 +587,7 @@ public class Layer {
         lyr += "\"" + notes.replaceAll("\n", " ").replaceAll("\"", "\\\"") + "\", "; //
         lyr += "\"" + metadatapath + "\", ";
         lyr += "\"" + keywords + "\"";
+        lyr += "\"" + buffer_in_metres + "\"";
 
         return lyr;
     }
@@ -621,6 +634,7 @@ public class Layer {
         m.put("type", type);
         m.put("uid", uid);
         m.put("id", id);
+        m.put("buffer_in_metres", buffer_in_metres);
         m.put("dt_added", dt_added);
 
         return m;

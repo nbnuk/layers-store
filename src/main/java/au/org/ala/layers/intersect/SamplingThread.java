@@ -106,18 +106,19 @@ public class SamplingThread extends Thread {
         HashMap<Integer, GridClass> classes = intersectionFile.getClasses();
         String shapeFieldName = intersectionFile.getShapeFields();
         String fileName = intersectionFile.getFilePath();
-        if (withCoordinateUncertainty) fileName = fileName + "_1414mbuffer"; //** RR test
+        boolean isBufferedLayer = (withCoordinateUncertainty && intersectionFile.getBufferInMetres() > 0);
+        if (isBufferedLayer) fileName = fileName + "_buffer"; //note that withCoordinateUncertainty is inadequate on its own, the layer has to have a buffered version
         String name = intersectionFile.getFieldId();
         long start = System.currentTimeMillis();
         logger.info("Starting sampling " + points.length + " points in " + name + ":"
-                + fileName + (shapeFieldName == null ? "" : " field: " + shapeFieldName + (withCoordinateUncertainty? " coordinateUncertainty included" : "")));
+                + fileName + (shapeFieldName == null ? "" : " field: " + shapeFieldName + (isBufferedLayer? " coordinateUncertainty included" : "")));
         callback.progressMessage("Started sampling layer:" + intersectionFile.getLayerName());
         if (shapeFieldName != null) {
-            intersectShape(fileName, shapeFieldName, points, sb, withCoordinateUncertainty);
+            intersectShape(fileName, shapeFieldName, points, sb, isBufferedLayer);
         } else if (classes != null) {
-            intersectGridAsContextual(fileName, classes, points, sb); //TODO: implement withCoordinateUncertainty
+            intersectGridAsContextual(fileName, classes, points, sb); //TODO: implement isBufferedLayer? low priority
         } else {
-            intersectGrid(fileName, points, sb); //TODO: implement withCoordinateUncertainty
+            intersectGrid(fileName, points, sb); //TODO: implement isBufferedLayer? low priority
         }
 
         logger.info("Finished sampling " + points.length + " points in " + name + ":"

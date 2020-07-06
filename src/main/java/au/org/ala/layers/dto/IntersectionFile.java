@@ -29,6 +29,7 @@ public class IntersectionFile {
     String layerPid;
     String fieldName;
     String type;
+    Integer bufferInMetres;
     HashMap<Integer, GridClass> classes;
 
     public IntersectionFile(String name, String filePath, String shapeFields, String layerName, String fieldId, String fieldName, String layerPid, String type, HashMap<Integer, GridClass> classes) {
@@ -41,6 +42,20 @@ public class IntersectionFile {
         this.layerPid = layerPid;
         this.type = type;
         this.classes = classes;
+        this.bufferInMetres = 0;
+    }
+
+    public IntersectionFile(String name, String filePath, String shapeFields, String layerName, String fieldId, String fieldName, String layerPid, String type, HashMap<Integer, GridClass> classes, Integer bufferInMetres) {
+        this.name = name.trim();
+        this.filePath = filePath.trim();
+        this.shapeFields = (shapeFields == null) ? null : shapeFields.trim();
+        this.layerName = layerName;
+        this.fieldId = fieldId;
+        this.fieldName = fieldName;
+        this.layerPid = layerPid;
+        this.type = type;
+        this.classes = classes;
+        this.bufferInMetres = (bufferInMetres == null? 0 : bufferInMetres);
     }
 
     public String getName() {
@@ -113,5 +128,13 @@ public class IntersectionFile {
 
     public void setType(String type) {
         this.type = type;
+    }
+
+    public Integer getBufferInMetres() {
+        return bufferInMetres;
+    }
+
+    public void setBufferInMetres(Integer bufferInMetres) {
+        this.bufferInMetres = (bufferInMetres == null? 0 : bufferInMetres);
     }
 }
