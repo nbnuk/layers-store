@@ -19,8 +19,7 @@ import au.org.ala.layers.dto.GridClass;
 import au.org.ala.layers.dto.IntersectionFile;
 import org.apache.log4j.Logger;
 
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -226,10 +225,18 @@ public class SamplingThread extends Thread {
                             sb.append("\n");
                         }
                         if (valuesMult[i][0] >= 0) {
-                            for (int j = 0; j < valuesMult[i].length; j++ ) {
-                                String raw_val = categories[valuesMult[i][j]];
-                                if (j > 0) sb.append("|"); //note, that legitimate shape names with their own pipe marks will break this
+                            Set<Integer> valuesDistinct = new HashSet<Integer>();
+                            for(int k = 0; k < valuesMult[i].length; k++){
+                                valuesDistinct.add(valuesMult[i][k]);
+                            }
+                            Iterator it = valuesDistinct.iterator();
+                            boolean first = true;
+                            while (it.hasNext()) {
+                                Integer val = (Integer) it.next();
+                                String raw_val = categories[val];
+                                if (!first) sb.append("|"); //note, that legitimate shape names with their own pipe marks will break this
                                 sb.append(raw_val.replaceAll("\\r\\n|\\r|\\n", ""));
+                                first = false;
                             }
                         } else {
                             sb.append("");
