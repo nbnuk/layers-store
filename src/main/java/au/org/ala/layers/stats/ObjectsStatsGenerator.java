@@ -247,24 +247,43 @@ class AreaThread extends Thread {
                 try {
                     String data = lbq.take();
                     pid = data;
-                    String sql = "SELECT ST_AsText(the_geom) as wkt from objects where pid = '" + pid + "';";
-                    ResultSet rs = s.executeQuery(sql);
-                    String wkt = "";
-                    while (rs.next()) {
-                        wkt = rs.getString("wkt");
+                    if (!pid.equals("2570")) { //this is a temporary NBN-specific exclusion. The object with pid 2570 is in cl1001: (J4.2 road network), and seems to be causing an issue where any new layer triggered the following error (where line 251 was 'ResultSet rs = s.executeQuery(sql);')
+                        /*
+                        loading area_km ...
+10:18:29,810 ERROR AreaThread:269 - ERROR: invalid memory alloc request size 1073741824
+org.postgresql.util.PSQLException: ERROR: invalid memory alloc request size 1073741824
+	at org.postgresql.core.v3.QueryExecutorImpl.receiveErrorResponse(QueryExecutorImpl.java:2161)
+	at org.postgresql.core.v3.QueryExecutorImpl.processResults(QueryExecutorImpl.java:1890)
+	at org.postgresql.core.v3.QueryExecutorImpl.execute(QueryExecutorImpl.java:255)
+	at org.postgresql.jdbc2.AbstractJdbc2Statement.execute(AbstractJdbc2Statement.java:559)
+	at org.postgresql.jdbc2.AbstractJdbc2Statement.executeWithFlags(AbstractJdbc2Statement.java:403)
+	at org.postgresql.jdbc2.AbstractJdbc2Statement.executeQuery(AbstractJdbc2Statement.java:283)
+	at au.org.ala.layers.stats.AreaThread.run(ObjectsStatsGenerator.java:251)
+Load layer into geoserver
+Creating layer in geoserver...
+                         */
+                        //also, attempted to fix corrupted data with guidance on https://stackoverflow.com/questions/32687602/postgresql-9-4-suddenly-invalid-memory-alloc-request-size but it made no difference (it found one corrupt row in cl74 which was removed, but this did not affect the error above)
+                        //the pid = 2570 record can be retrieved using 'select pid, fid from objects where area_km is null and st_geometrytype(the_geom) <> 'ST_Point' ;' as per queue of records to process passed to this thread.
+                        logger.info("pid = " + pid);
+                        String sql = "SELECT ST_AsText(the_geom) as wkt from objects where pid = '" + pid + "';";
+                        ResultSet rs = s.executeQuery(sql);
+                        String wkt = "";
+                        while (rs.next()) {
+                            wkt = rs.getString("wkt");
+                        }
+
+                        area = SpatialUtil.calculateArea(wkt) / 1000.0 / 1000.0;
+
+                        sql = "UPDATE objects SET area_km = " + area + " WHERE pid='" + pid + "'";
+                        int update = s.executeUpdate(sql);
+                        logger.info(pid + " has area " + area + " sq km");
+                        rs.close();
                     }
-
-                    area = SpatialUtil.calculateArea(wkt) / 1000.0 / 1000.0;
-
-                    sql = "UPDATE objects SET area_km = " + area + " WHERE pid='" + pid + "'";
-                    int update = s.executeUpdate(sql);
-                    logger.info(pid + " has area " + area + " sq km");
-                    rs.close();
                 } catch (InterruptedException e) {
                     break;
                 } catch (Exception e) {
-                    logger.debug("ERROR PROCESSING PID " + pid);
-                    logger.debug("AREA CALCULATION IS " + area);
+                    logger.info("ERROR PROCESSING PID " + pid);
+                    logger.info("AREA CALCULATION IS " + area);
                     s.cancel();
                     logger.error(e.getMessage(), e);
                 }
